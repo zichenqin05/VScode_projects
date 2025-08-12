@@ -68,30 +68,25 @@ def graph2():
     
     plt.figure(figsize=(10, 6))
 
-    # 绘制箱线图
-    sns.boxplot(
+
+
+    # 绘制条形图（x轴为上传类型，y轴为均值，误差线为标准差）
+    sns.barplot(
         data=data,
         x='upload_type',
         y='quality_level',
-        palette='Set3'
+        errorbar='sd',  # 误差线显示标准差
+        capsize=0.1,    # 误差线顶部横线长度
+        palette='Set2'
     )
 
-    # 添加散点显示原始数据分布
-    sns.stripplot(
-        data=data,
-        x='upload_type',
-        y='quality_level',
-        color='black',
-        size=5,
-        alpha=0.5
-    )
-
-    plt.title('不同上传类型的用户体验质量分布', fontsize=14)
+    # 添加标题和标签
+    plt.title('不同上传类型的用户体验质量水平', fontsize=14)
     plt.xlabel('上传类型', fontsize=12)
-    plt.ylabel('质量水平', fontsize=12)
-    plt.xticks(rotation=45)
+    plt.ylabel('质量水平（均值±标准差）', fontsize=12)
+    plt.xticks(rotation=45)  # 旋转x轴标签，避免重叠
     plt.grid(axis='y', linestyle='--', alpha=0.7)
-    plt.tight_layout()
+    plt.tight_layout()  # 自动调整布局
     plt.show()
 
 if __name__ == "__main__":
