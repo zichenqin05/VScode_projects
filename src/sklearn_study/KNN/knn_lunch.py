@@ -60,7 +60,7 @@ if __name__ == "__main__":
     }
 
     # 预测并输出结果
-    level = predict_new_video(new_video1)
+    level = predict_new_video(new_video2)
     print(f"视频预测质量等级：{level}级")
 
 
