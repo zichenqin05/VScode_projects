@@ -92,7 +92,7 @@ def grade():
 
     # 定义等级区间和对应的标签
     bins = [-np.inf, 7, 14, 21, np.inf] 
-    labels = [4, 3, 2, 1]  # 对应等级: 1级最好，4级最差
+    labels = [1, 2, 3, 4]  # 对应等级: 1级最差，4级最好
     
     # 划分等级
     data['quality_level'] = pd.cut(
