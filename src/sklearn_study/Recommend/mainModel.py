@@ -86,10 +86,10 @@ def find_videos(tag):
 def load_model_and_scaler():
     """加载保存的模型、标准化器和特征列名"""
     # 加载模型和标准化器
-    knn = joblib.load(r'src\sklearn_study\KNN\models\knn_model.pkl')
-    scaler = joblib.load(r'src\sklearn_study\KNN\models\scaler.pkl')
+    knn = joblib.load(r'sklearn_study\KNN\models\knn_model.pkl')
+    scaler = joblib.load(r'sklearn_study\KNN\models\scaler.pkl')
     # 加载特征列名
-    with open(r'src\sklearn_study\KNN\models\feature_columns.txt', 'r') as f:
+    with open(r'sklearn_study\KNN\models\feature_columns.txt', 'r') as f:
         feature_columns = f.read().split(',')
     return knn, scaler, feature_columns
 
@@ -115,12 +115,18 @@ def main(user_id):
 
     print("正在根据视频数据库和视频质量为用户推荐优质视频...")
 
+    # 查询用户已看过的视频ID
+    watched_df = sql.do(f"""SELECT video_id FROM log_standard WHERE user_id = {user_id}""")
+    watched_videos = set(str(row[0]) for row in watched_df)
+
     for tag in tag_list:
         tag_str = str(int(tag))
         tag_videos = data[data['tag'] == tag_str]
         found = False
         # 遍历该tag下所有视频
         for idx, row in tag_videos.iterrows():
+            if str(row['video_id']) in watched_videos:
+                continue  # 跳过已看过的视频
             video_data = row.to_frame().T  # 转为DataFrame
             # 只保留模型需要的特征列
             video_features = video_data.drop(['video_id', 'tag'], axis=1, errors='ignore')
@@ -129,18 +135,21 @@ def main(user_id):
                 recommended[tag_str] = row['video_id']
                 found = True
                 break
-        # 如果没有评分大于3的视频，可以选一个评分最高的
+        # 如果没有评分大于3且未看过的视频，可以选一个评分最高且未看过的
         if not found and not tag_videos.empty:
             max_score = -1
             best_video_id = None
             for idx, row in tag_videos.iterrows():
+                if str(row['video_id']) in watched_videos:
+                    continue
                 video_data = row.to_frame().T
                 video_features = video_data.drop(['video_id', 'tag'], axis=1, errors='ignore')
                 level = predict_new_video(video_features)
                 if level > max_score:
                     max_score = level
                     best_video_id = row['video_id']
-            recommended[tag_str] = best_video_id
+            if best_video_id is not None:
+                recommended[tag_str] = best_video_id
 
     print(f"推荐用户{user_id}的视频为：")
     for tag, vid in recommended.items():
