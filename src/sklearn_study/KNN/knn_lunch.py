@@ -1,6 +1,5 @@
 import pandas as pd
 import joblib  # 用于加载模型
-import KNN_model
 
 def load_model_and_scaler():
     """加载保存的模型、标准化器和特征列名"""
