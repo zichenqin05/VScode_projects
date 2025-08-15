@@ -1,7 +1,7 @@
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from collections import defaultdict
-import load_data as ld
+from . import load_data as ld
 
 def create_user_features(df):
     """为每个用户创建聚合特征（用于聚类）"""
