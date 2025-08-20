@@ -86,10 +86,10 @@ def find_videos(tag):
 def load_model_and_scaler():
     """加载保存的模型、标准化器和特征列名"""
     # 加载模型和标准化器
-    knn = joblib.load(r'sklearn_study\KNN\models\knn_model.pkl')
-    scaler = joblib.load(r'sklearn_study\KNN\models\scaler.pkl')
+    knn = joblib.load(r'src\sklearn_study\KNN\models\knn_model.pkl')
+    scaler = joblib.load(r'src\sklearn_study\KNN\models\scaler.pkl')
     # 加载特征列名
-    with open(r'sklearn_study\KNN\models\feature_columns.txt', 'r') as f:
+    with open(r'src\sklearn_study\KNN\models\feature_columns.txt', 'r') as f:
         feature_columns = f.read().split(',')
     return knn, scaler, feature_columns
 
@@ -109,7 +109,9 @@ def predict_new_video(new_video_data):
     return predicted_level[0]
 
 def main(user_id):
+    # 首先先找到有哪些tag
     tag_list = km.lunch_recommendation(user_id)
+    # 然后匹配视频id
     data = find_videos(tag_list)
     recommended = {}
 
