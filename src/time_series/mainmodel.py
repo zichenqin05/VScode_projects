@@ -1,17 +1,19 @@
 import sql
 import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor
 import numpy as np
-from matplotlib.ticker import MaxNLocator
+import matplotlib.pyplot as plt
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import StandardScaler
+import warnings
+warnings.filterwarnings('ignore')  # 忽略统计模型的警告信息
 
 # 设置中文显示
 plt.rcParams['font.family'] = ['SimHei']
 plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
 
 def get_data():
-    """获取并处理数据，返回处理后的数据集"""
+    """获取并处理数据，返回处理后的数据集，新增周末特征"""
     # 查询数据
     df = sql.do("""SELECT 
                 l.user_id,
@@ -52,17 +54,24 @@ def get_data():
     for day, group in hourly.groupby('day'):
         idx = group['like_cnt'].idxmax()
         peak_row = group.loc[idx]
+        
+        # 判断是否为周末
+        day_date = pd.to_datetime(day)
+        is_weekend = 1 if day_date.weekday() >= 5 else 0  # 5是周六，6是周日
+        
         peak_list.append({
             'day': day,
             'hour': peak_row['hour'],
             'hour_of_day': peak_row['hour_of_day'],
             'like_cnt': peak_row['like_cnt'],
-            'comment_cnt': peak_row['comment_cnt'],  # 新增评论量
-            'share_cnt': peak_row['share_cnt']       # 新增分享量
+            'comment_cnt': peak_row['comment_cnt'],
+            'share_cnt': peak_row['share_cnt'],
+            'is_weekend': is_weekend,
+            'day_of_week': day_date.weekday()  # 0-6，周一到周日
         })
     peaks = pd.DataFrame(peak_list)
     
-    # 处理异常值：只使用Q1到Q3范围内的数据进行训练
+    # 处理异常值
     q1 = peaks['like_cnt'].quantile(0.25)
     q3 = peaks['like_cnt'].quantile(0.75)
     iqr = q3 - q1
@@ -70,7 +79,7 @@ def get_data():
     upper_bound = q3 + 1.5 * iqr
     non_outliers = peaks[(peaks['like_cnt'] >= lower_bound) & (peaks['like_cnt'] <= upper_bound)].copy()
     
-    # 为时间序列添加索引
+    # 为时间序列添加索引作为特征
     non_outliers['day_idx'] = np.arange(len(non_outliers))
     peaks['day_idx'] = np.arange(len(peaks))
     
@@ -84,156 +93,141 @@ def get_data():
         'upper_bound': upper_bound
     }
 
-def train_models(data, future_days=5):
-    """训练预测模型并返回预测结果"""
-    peaks = data['peaks']
-    non_outliers = data['non_outliers']
+def train_models(data, future_days=7):
+    """训练预测模型（使用SARIMA）并返回预测结果，增加滞后特征"""
+    peaks = data['peaks'].copy()
+    non_outliers = data['non_outliers'].copy()
     
-    # 1. 训练点赞量预测模型（线性回归）
-    model_like = LinearRegression()
-    model_like.fit(non_outliers[['day_idx']], non_outliers['like_cnt'])
+    # ----------------------
+    # 1. 添加滞后特征
+    # ----------------------
+    def add_lag_features(df):
+        df = df.copy()
+        # 滞后1天的点赞量（前一天的峰值点赞量）
+        df['lag1_like'] = df['like_cnt'].shift(1).fillna(df['like_cnt'].mean())
+        # 滞后7天的点赞量（上周同一天的峰值点赞量，捕捉周周期）
+        df['lag7_like'] = df['like_cnt'].shift(7).fillna(df['like_cnt'].mean())
+        # 滞后1天的小时（前一天的峰值小时）
+        df['lag1_hour'] = df['hour_of_day'].shift(1).fillna(df['hour_of_day'].mean())
+        return df
     
-    # 2. 训练小时预测模型（随机森林）
-    model_hour = RandomForestRegressor(n_estimators=50, random_state=42)
-    model_hour.fit(non_outliers[['day_idx']], non_outliers['hour_of_day'])
+    # 为训练数据添加滞后特征
+    non_outliers = add_lag_features(non_outliers)
+    # 为所有峰值数据添加滞后特征（用于历史预测）
+    peaks = add_lag_features(peaks)
     
-    # 生成历史预测值
-    historical_like_pred = model_like.predict(peaks[['day_idx']])
-    historical_hour_pred = model_hour.predict(peaks[['day_idx']])
+    # ----------------------
+    # 2. 训练点赞量预测模型（SARIMA + 外部特征）
+    # ----------------------
+    # 准备时间序列和外部特征（滞后特征+周末特征）
+    ts_like = non_outliers.set_index('day')['like_cnt'].sort_index()
+    exog_features = non_outliers[['is_weekend', 'lag1_like', 'lag7_like']]  # 外部回归因子
     
-    # 预测未来指定天数
+    # SARIMA模型参数：(p,d,q)为非季节性参数，(P,D,Q,s)为季节性参数（s=7表示周周期）
+    sarima_order = (1, 1, 1)
+    seasonal_order = (1, 1, 1, 7)
+    
+    # 拟合SARIMA模型（加入外部特征）
+    model_like = SARIMAX(
+        ts_like.values,
+        exog=exog_features.values,
+        order=sarima_order,
+        seasonal_order=seasonal_order,
+        enforce_stationarity=False,
+        enforce_invertibility=False
+    )
+    model_like_fit = model_like.fit(disp=False)
+    
+    # 生成历史点赞量预测
+    historical_like_pred = model_like_fit.predict(
+        start=0, 
+        end=len(ts_like)-1, 
+        exog=exog_features.values
+    )
+    
+    # ----------------------
+    # 3. 训练小时预测模型（随机森林 + 滞后特征）
+    # ----------------------
+    # 特征包括：滞后特征、周末、星期几
+    X_hour_train = non_outliers[['is_weekend', 'day_of_week', 'lag1_hour', 'lag1_like']]
+    y_hour_train = non_outliers['hour_of_day']
+    
+    model_hour = RandomForestRegressor(
+        n_estimators=100,
+        max_depth=5,
+        random_state=42
+    )
+    model_hour.fit(X_hour_train, y_hour_train)
+    
+    # 生成历史小时预测
+    historical_hour_pred = model_hour.predict(
+        peaks[['is_weekend', 'day_of_week', 'lag1_hour', 'lag1_like']]
+    )
+    
+    # ----------------------
+    # 4. 预测未来数据
+    # ----------------------
     last_day_idx = peaks['day_idx'].max()
-    future_indices = np.arange(last_day_idx + 1, last_day_idx + 1 + future_days).reshape(-1, 1)
-    
-    # 预测未来的点赞量和小时
-    future_like_preds = model_like.predict(future_indices)
-    future_hour_preds = model_hour.predict(future_indices)
-    
-    # 处理小时预测结果（确保在0-23范围内，并取整）
-    future_hour_preds = [int(round(np.clip(hour, 0, 23))) for hour in future_hour_preds]
-    
-    # 生成未来日期字符串
     last_date = pd.to_datetime(peaks['day'].iloc[-1])
-    future_dates = [(last_date + pd.Timedelta(days=i+1)).strftime('%Y-%m-%d') 
-                   for i in range(future_days)]
+    
+    # 初始化未来特征存储
+    future_dates = []
+    future_weekends = []
+    future_like_preds = []
+    future_hour_preds = []
+    
+    # 初始化滞后特征（用最后已知的值）
+    last_like = peaks['like_cnt'].iloc[-1]
+    last_like7 = peaks['like_cnt'].iloc[-7] if len(peaks)>=7 else peaks['like_cnt'].mean()
+    last_hour = peaks['hour_of_day'].iloc[-1]
+    
+    for i in range(future_days):
+        # 计算未来日期
+        future_date = last_date + pd.Timedelta(days=i+1)
+        future_dates.append(future_date.strftime('%Y-%m-%d'))
+        is_weekend = 1 if future_date.weekday() >=5 else 0
+        future_weekends.append(is_weekend)
+        
+        # 构建未来外部特征（包含滞后特征）
+        future_exog = np.array([[
+            is_weekend,
+            last_like,  # 滞后1天（用上一步预测的点赞量）
+            last_like7  # 滞后7天（用7天前的实际值）
+        ]])
+        
+        # 预测未来点赞量
+        like_pred = model_like_fit.forecast(steps=1, exog=future_exog)[0]
+        like_pred = max(0, like_pred)  # 确保非负
+        future_like_preds.append(like_pred)
+        
+        # 构建小时预测特征（包含滞后特征）
+        hour_features = pd.DataFrame([[
+            is_weekend,
+            future_date.weekday(),
+            last_hour,  # 滞后1天的小时
+            last_like   # 滞后1天的点赞量
+        ]], columns=X_hour_train.columns)
+        
+        # 预测未来小时
+        hour_pred = model_hour.predict(hour_features)[0]
+        hour_pred_rounded = int(round(np.clip(hour_pred, 0, 23)))
+        future_hour_preds.append(hour_pred_rounded)
+        
+        # 更新滞后特征（用于下一次预测）
+        last_like7 = last_like if (i+1) %7 ==0 else last_like7  # 每7天更新一次lag7
+        last_like = like_pred
+        last_hour = hour_pred_rounded
     
     return {
-        'model_like': model_like,
+        'model_like': model_like_fit,
         'model_hour': model_hour,
         'historical_like_pred': historical_like_pred,
         'historical_hour_pred': historical_hour_pred,
-        'future_indices': future_indices.flatten(),
+        'future_indices': np.arange(last_day_idx + 1, last_day_idx + 1 + future_days),
         'future_dates': future_dates,
-        'future_like_preds': future_like_preds,
-        'future_hour_preds': future_hour_preds
+        'future_weekends': future_weekends,
+        'future_like_preds': np.array(future_like_preds),
+        'future_hour_preds': future_hour_preds,
+        'ts_like': ts_like
     }
-
-def plot_time_and_interactive(data, predictions):
-    """绘制时间（折线）与互动值（柱状）的组合图表"""
-    peaks = data['peaks']
-    future_dates = predictions['future_dates']
-    future_like_preds = predictions['future_like_preds']
-    future_hour_preds = predictions['future_hour_preds']
     
-    # 整合历史与未来数据
-    history_dates = list(peaks['day'])  # 历史日期
-    all_dates = history_dates + future_dates  # 所有日期（历史+未来）
-    n_history = len(history_dates)
-    n_future = len(future_dates)
-    
-    # 互动值数据（柱状图用）：历史峰值点赞量 + 未来预测点赞量
-    history_likes = peaks['like_cnt']
-    all_likes = list(history_likes) + list(future_like_preds)
-    
-    # 时间特征数据（折线图用）：历史峰值小时 + 未来预测小时
-    history_hours = peaks['hour_of_day']
-    all_hours = list(history_hours) + list(future_hour_preds)
-    
-    # 创建画布和双轴（左侧：互动值，右侧：时间）
-    fig, ax1 = plt.subplots(figsize=(16, 8))
-    
-    # 左侧y轴：柱状图展示互动值（点赞量）
-    bars = ax1.bar(
-        all_dates, 
-        all_likes, 
-        color=['#1f77b4']*n_history + ['#ff7f0e']*n_future,  # 历史蓝色，未来橙色
-        alpha=0.7, 
-        width=0.6,
-        label='每日峰值点赞量'
-    )
-    ax1.set_xlabel('日期', fontsize=12)
-    ax1.set_ylabel('峰值点赞量', color='#1f77b4', fontsize=12)
-    ax1.tick_params(axis='y', labelcolor='#1f77b4')
-    ax1.grid(axis='y', linestyle='--', alpha=0.3)
-    
-    # 右侧y轴：折线图展示时间特征（峰值出现小时）
-    ax2 = ax1.twinx()  # 共享x轴的第二个y轴
-    # 绘制历史小时折线
-    ax2.plot(
-        history_dates, 
-        history_hours, 
-        marker='o', 
-        color='#2ca02c', 
-        linewidth=2, 
-        markersize=6,
-        label='历史峰值小时'
-    )
-    # 绘制未来小时折线（单独设置颜色区分）
-    if n_future > 0:
-        ax2.plot(
-            future_dates, 
-            future_hour_preds, 
-            marker='s', 
-            color='#d62728', 
-            linewidth=2, 
-            markersize=6,
-            label='预测峰值小时'
-        )
-    ax2.set_ylabel('峰值出现小时（0-23）', color='#2ca02c', fontsize=12)
-    ax2.tick_params(axis='y', labelcolor='#2ca02c')
-    ax2.set_ylim(0, 23)  # 小时范围固定为0-23
-    ax2.set_yticks(range(0, 24, 3))  # 每3小时显示一个刻度
-    ax2.grid(axis='y', linestyle='--', alpha=0.3)
-    
-    # 合并图例
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=10)
-    
-    # 设置x轴格式
-    ax1.xaxis.set_major_locator(MaxNLocator(nbins=12))  # 控制x轴显示的日期数量
-    plt.xticks(rotation=45, ha='right', fontsize=10)
-    
-    # 标题
-    plt.title('每日峰值点赞量（柱状）与峰值出现小时（折线）趋势及预测', fontsize=14)
-    
-    plt.tight_layout()
-    plt.show()
-
-# 使用示例
-if __name__ == "__main__":
-    # 获取数据
-    data = get_data()
-    
-    # 训练模型并获取预测（可指定预测未来天数，默认5天）
-    predictions = train_models(data, future_days=5)
-    
-    # 绘制时间与互动值组合图表
-    plot_time_and_interactive(data, predictions)
-    
-    # 输出预测结果
-    print("历史每日峰值信息：")
-    print(data['peaks'][['day', 'hour_of_day', 'like_cnt', 'comment_cnt', 'share_cnt']]
-          .rename(columns={'hour_of_day': '峰值出现小时', 'like_cnt': '峰值点赞量', 
-                          'comment_cnt': '峰值评论量', 'share_cnt': '峰值分享量'}))
-    
-    print(f"\n四分位数范围 (用于训练的点赞量范围): {data['q1']:.2f} - {data['q3']:.2f}")
-    outliers = data['peaks'][(data['peaks']['like_cnt'] < data['lower_bound']) | 
-                            (data['peaks']['like_cnt'] > data['upper_bound'])]
-    print(f"异常值数量: {len(outliers)}")
-    
-    print("\n未来预测：")
-    for i in range(len(predictions['future_dates'])):
-        print(f"日期: {predictions['future_dates'][i]}, "
-              f"预测峰值小时: {predictions['future_hour_preds'][i]}:00, "
-              f"预测点赞量: {int(predictions['future_like_preds'][i])}")
