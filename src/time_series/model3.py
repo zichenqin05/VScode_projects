@@ -67,42 +67,64 @@ def get_data(train_cutoff='2022-05-07 00:00:00'):
         'train_data': train_data,
         'test_data': test_data
     }
-
+                                                                                                                                                                                                                                                                                  
 
 def train_hybrid_model(data, extend_hours=24):
     """混合模型：SARIMA学习周期+趋势 + 随机森林修正残差"""
     train_data = data['train_data'].copy()
     test_data = data['test_data'].copy()
     total_pred_hours = len(test_data) + extend_hours  # 总预测48小时
-    
-    # ----------------------
-    # 1. 时间序列分解（提取周期、趋势、残差）
-    # 手动记录分解模型类型（解决DecomposeResult无model属性的问题）
-    # ----------------------
+
     period = 24  # 日周期
+    if len(train_data) < 2 * period:
+        raise ValueError(f"训练数据长度太短，至少需要 {2*period}，实际为 {len(train_data)}")
+
+    # 避免0值导致乘法分解出错
+    train_data_adj = train_data + 1
+
     # 尝试加法和乘法分解
-    decomposition_add = seasonal_decompose(train_data, model='additive', period=period)
-    decomposition_mul = seasonal_decompose(train_data, model='multiplicative', period=period)
-    
-    # 计算残差方差，选择更优的分解方式
+    decomposition_add = seasonal_decompose(train_data_adj, model='additive', period=period, extrapolate_trend='freq')
+    decomposition_mul = seasonal_decompose(train_data_adj, model='multiplicative', period=period, extrapolate_trend='freq')
+
     resid_add_var = decomposition_add.resid.dropna().var()
     resid_mul_var = decomposition_mul.resid.dropna().var()
-    
-    # 手动记录分解模型类型（关键修复）
-    if resid_add_var < resid_mul_var:
+
+    # 选择残差方差较大的分解方式（更能反映波动）
+    if resid_add_var > resid_mul_var:
         decomposition = decomposition_add
-        decompose_model = 'additive'  # 用变量单独记录模型类型
+        decompose_model = 'additive'
         print("选择加法模型进行时间序列分解")
     else:
         decomposition = decomposition_mul
-        decompose_model = 'multiplicative'  # 用变量单独记录模型类型
+        decompose_model = 'multiplicative'
         print("选择乘法模型进行时间序列分解")
-    
-    # 提取各成分
-    trend = decomposition.trend.dropna()
-    seasonal = decomposition.seasonal.dropna()
-    residual = decomposition.resid.dropna()
-    
+
+    # 用原始index对齐
+    trend = decomposition.trend.reindex(train_data.index)
+    seasonal = decomposition.seasonal.reindex(train_data.index)
+    residual = decomposition.resid.reindex(train_data.index)
+
+    # 还原残差（减去1）
+    if decompose_model == 'multiplicative':
+        trend_seasonal = trend * seasonal
+        residual = residual - 1
+    else:
+        trend_seasonal = trend + seasonal
+        residual = residual
+
+    # 检查残差
+    print("trend 非零样本数：", (trend.fillna(0) != 0).sum())
+    print("seasonal 非零样本数：", (seasonal.fillna(0) != 0).sum())
+    print("residual 非零样本数：", (residual.fillna(0) != 0).sum())
+    print("residual 样本预览：", residual.head(10).to_list())
+
+    # 用dropna()去除NaN
+    valid_idx = residual.dropna().index
+    residual = residual.loc[valid_idx]
+
+    if len(residual) == 0:
+        raise ValueError("分解后残差全为NaN，无法训练随机森林。请检查数据或调整分解周期。")
+
     # 组合“趋势+周期”成分（根据分解类型）
     if decompose_model == 'additive':
         trend_seasonal = trend + seasonal
