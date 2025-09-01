@@ -6,13 +6,13 @@ import time
 
 def get_user_id_and_recommend():
     root = tk.Tk()
-    root.title("短视频推荐系统")
+    root.title("Short Video Recommendation System")
     root.geometry("500x400")
 
     large_font = ("SimHei", 16)
     result_font = ("SimHei", 12)
 
-    label = ttk.Label(root, text="请输入用户ID：", font=large_font)
+    label = ttk.Label(root, text="Please enter user ID:", font=large_font)
     label.pack(pady=20)
 
     entry = ttk.Entry(root, font=large_font, width=15)
@@ -25,64 +25,64 @@ def get_user_id_and_recommend():
     status_label.pack(pady=5)
 
     progress = ttk.Progressbar(root, orient="horizontal", length=350, mode="determinate")
-    # 默认不显示进度条
+    # Hide progress bar by default
     progress.pack_forget()
 
     result_frame = ttk.Frame(root)
-    result_label = ttk.Label(result_frame, text="推荐结果将显示在这里...", font=result_font, wraplength=350, justify="left")
+    result_label = ttk.Label(result_frame, text="Recommendation results will be shown here...", font=result_font, wraplength=350, justify="left")
     result_label.pack(pady=10)
 
     def recommend_thread(user_id):
         try:
-            # 显示进度条并重置为0
+            # Show progress bar and reset to 0
             progress.pack(pady=5)
             progress["value"] = 0
-            status_label.config(text="加载数据库中...")
+            status_label.config(text="Loading database...")
             root.update_idletasks()
             progress["value"] = 20
             time.sleep(0.5)
 
-            status_label.config(text="正在根据视频数据库和视频质量为用户推荐优质视频...")
+            status_label.config(text="Recommending high-quality videos based on the database and video quality...")
             root.update_idletasks()
             progress["value"] = 60
 
             recommendations = mm.main(user_id)
 
-            status_label.config(text="计算完成！")
+            status_label.config(text="Calculation completed!")
             progress["value"] = 100
             root.update_idletasks()
-            time.sleep(0.5)  # 显示满格一会儿
+            time.sleep(0.5)  # Show full bar for a moment
 
-            # 兼容字典或列表
+            # Support dict or list
             if isinstance(recommendations, dict) and recommendations:
-                result_text = f"为用户 {user_id} 推荐的视频：\n"
+                result_text = f"Recommended videos for user {user_id}:\n"
                 for tag, vid in recommendations.items():
-                    result_text += f"类别 {tag} 推荐视频ID: {vid}\n"
+                    result_text += f"Category {tag} recommended video ID: {vid}\n"
                 result_label.config(text=result_text, foreground="black")
             elif isinstance(recommendations, list) and recommendations:
-                result_text = f"为用户 {user_id} 推荐的视频：\n" + "\n".join([f"- {item}" for item in recommendations[:5]])
+                result_text = f"Recommended videos for user {user_id}:\n" + "\n".join([f"- {item}" for item in recommendations[:5]])
                 result_label.config(text=result_text, foreground="black")
             else:
-                result_label.config(text="未找到推荐结果", foreground="orange")
+                result_label.config(text="No recommendation found", foreground="orange")
         except Exception as e:
-            result_label.config(text="未找到推荐结果", foreground="orange")
-            messagebox.showerror("错误", f"推荐过程出错：{str(e)}")
+            result_label.config(text="No recommendation found", foreground="orange")
+            messagebox.showerror("Error", f"Recommendation process error: {str(e)}")
         finally:
-            # 计算结束后隐藏进度条
+            # Hide progress bar after calculation
             progress.pack_forget()
             status_label.config(text="")
 
     def confirm():
         error_label.config(text="")
-        result_label.config(text="推荐结果将显示在这里...", foreground="black")
+        result_label.config(text="Recommendation results will be shown here...", foreground="black")
         status_label.config(text="")
         try:
             user_id = int(entry.get())
             threading.Thread(target=recommend_thread, args=(user_id,), daemon=True).start()
         except ValueError:
-            error_label.config(text="请输入有效的ID！")
+            error_label.config(text="Please enter a valid ID!")
 
-    confirm_btn = ttk.Button(root, text="获取推荐", command=confirm)
+    confirm_btn = ttk.Button(root, text="Get Recommendation", command=confirm)
     confirm_btn.pack(pady=10)
 
     result_frame.pack(pady=10, fill="x", padx=20)

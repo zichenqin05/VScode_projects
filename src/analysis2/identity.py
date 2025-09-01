@@ -4,14 +4,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
-# 设置中文显示
+# Set Chinese font display
 plt.rcParams["font.family"] = ["SimHei"]
-plt.rcParams["axes.unicode_minus"] = False  # 正确显示负号
+plt.rcParams["axes.unicode_minus"] = False  # Display negative signs correctly
 
 def statistic():
     pd.set_option('display.float_format', lambda x: '%.2f' % x)
 
-    # 从数据库获取数据
+    # Retrieve data from database
     df = sql.do("""SELECT
             user_id,
             is_live_streamer,
@@ -22,180 +22,180 @@ def statistic():
             FROM
             user_features_pure""")
 
-    # 转换为DataFrame并指定列名
+    # Convert to DataFrame and specify column names
     df = pd.DataFrame(df, columns=['user_id', 'live', 'author', 'followers', 'fans', 'friend'])
 
-    # 转换数值列的数据类型
+    # Convert data types of numeric columns
     numeric_cols = ['followers', 'fans', 'friend']
     df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce').fillna(0)
     
-    # 转换身份标识为布尔值
+    # Convert identity indicators to boolean values
     df['live'] = df['live'].map({'1': True, '0': False, True: True, False: False}).fillna(False)
     df['author'] = df['author'].map({'1': True, '0': False, True: True, False: False}).fillna(False)
     
-    # 定义用户类型：普通用户、仅直播、仅视频创作者、交叉身份（既是直播又是视频创作者）
-    df['user_type'] = '普通用户'
-    df.loc[df['live'] & ~df['author'], 'user_type'] = '仅直播主播'
-    df.loc[~df['live'] & df['author'], 'user_type'] = '仅视频创作者'
-    df.loc[df['live'] & df['author'], 'user_type'] = '交叉身份用户'
+    # Define user types: Regular User, Live Streamer Only, Video Creator Only, Cross-Identity User (both streamer and creator)
+    df['user_type'] = 'Regular User'
+    df.loc[df['live'] & ~df['author'], 'user_type'] = 'Live Streamer Only'
+    df.loc[~df['live'] & df['author'], 'user_type'] = 'Video Creator Only'
+    df.loc[df['live'] & df['author'], 'user_type'] = 'Cross-Identity User'
     
-    # 按用户类型分组
+    # Group by user type
     groups = {
-        '全部用户': df,
-        '普通用户': df[df['user_type'] == '普通用户'],
-        '仅直播主播': df[df['user_type'] == '仅直播主播'],
-        '仅视频创作者': df[df['user_type'] == '仅视频创作者'],
-        '交叉身份用户': df[df['user_type'] == '交叉身份用户']
+        'All Users': df,
+        'Regular User': df[df['user_type'] == 'Regular User'],
+        'Live Streamer Only': df[df['user_type'] == 'Live Streamer Only'],
+        'Video Creator Only': df[df['user_type'] == 'Video Creator Only'],
+        'Cross-Identity User': df[df['user_type'] == 'Cross-Identity User']
     }
     
-    # 查看基本统计量
+    # View basic statistics
     for name, group_df in groups.items():
-        print(f"\n{name}：")
+        print(f"\n{name}:")
         print(group_df[numeric_cols].describe())
 
     return df
 
 def graph(df):
-    # 同时支持英文和中文（优先用中文字体，英文会自动适配）
-    plt.rcParams["font.family"] = ["SimHei", "Arial", "sans-serif"]  # 中文优先，Arial作为英文后备
+    # Support both English and Chinese (prioritize Chinese font, English adapts automatically)
+    plt.rcParams["font.family"] = ["SimHei", "Arial", "sans-serif"]  # Chinese first, Arial as English fallback
 
-    # 设置颜色方案
+    # Set color scheme
     palette = sns.color_palette("Set2", 4)
-    type_order = ['普通用户', '仅直播主播', '仅视频创作者', '交叉身份用户']
+    type_order = ['Regular User', 'Live Streamer Only', 'Video Creator Only', 'Cross-Identity User']
     
-    # 1. 社交指标均值比较
+    # 1. Comparison of average social metrics
     plt.figure(figsize=(15, 8))
     
-    # 关注数均值
+    # Average number of followers
     plt.subplot(1, 3, 1)
     sns.barplot(x='user_type', y='followers', data=df, palette=palette, order=type_order,
                 hue='user_type', legend=False)
-    plt.title('不同用户类型的关注数均值比较')
-    plt.ylabel('关注数均值')
-    plt.xlabel('用户类型')
+    plt.title('Average Number of Followers by User Type')
+    plt.ylabel('Average Number of Followers')
+    plt.xlabel('User Type')
     plt.xticks(rotation=15)
     
-    # 粉丝数均值
+    # Average number of fans
     plt.subplot(1, 3, 2)
     sns.barplot(x='user_type', y='fans', data=df, palette=palette, order=type_order,
                 hue='user_type', legend=False)
-    plt.title('不同用户类型的粉丝数均值比较')
-    plt.ylabel('粉丝数均值')
-    plt.xlabel('用户类型')
+    plt.title('Average Number of Fans by User Type')
+    plt.ylabel('Average Number of Fans')
+    plt.xlabel('User Type')
     plt.xticks(rotation=15)
     
-    # 好友数均值
+    # Average number of friends
     plt.subplot(1, 3, 3)
     sns.barplot(x='user_type', y='friend', data=df, palette=palette, order=type_order,
                 hue='user_type', legend=False)
-    plt.title('不同用户类型的好友数均值比较')
-    plt.ylabel('好友数均值')
-    plt.xlabel('用户类型')
+    plt.title('Average Number of Friends by User Type')
+    plt.ylabel('Average Number of Friends')
+    plt.xlabel('User Type')
     plt.xticks(rotation=15)
     
     plt.tight_layout()
     plt.show()
     
-    # 2. 社交指标中位数比较（更能反映普通水平）
+    # 2. Comparison of median social metrics (better reflects average level)
     plt.figure(figsize=(15, 8))
     
-    # 关注数中位数
+    # Median number of followers
     plt.subplot(1, 3, 1)
     sns.barplot(x='user_type', y='followers', data=df, palette=palette, order=type_order,
                 estimator=np.median, hue='user_type', legend=False)
-    plt.title('不同用户类型的关注数中位数比较')
-    plt.ylabel('关注数中位数')
-    plt.xlabel('用户类型')
+    plt.title('Median Number of Followers by User Type')
+    plt.ylabel('Median Number of Followers')
+    plt.xlabel('User Type')
     plt.xticks(rotation=15)
     
-    # 粉丝数中位数
+    # Median number of fans
     plt.subplot(1, 3, 2)
     sns.barplot(x='user_type', y='fans', data=df, palette=palette, order=type_order,
                 estimator=np.median, hue='user_type', legend=False)
-    plt.title('不同用户类型的粉丝数中位数比较')
-    plt.ylabel('粉丝数中位数')
-    plt.xlabel('用户类型')
+    plt.title('Median Number of Fans by User Type')
+    plt.ylabel('Median Number of Fans')
+    plt.xlabel('User Type')
     plt.xticks(rotation=15)
     
-    # 好友数中位数
+    # Median number of friends
     plt.subplot(1, 3, 3)
     sns.barplot(x='user_type', y='friend', data=df, palette=palette, order=type_order,
                 estimator=np.median, hue='user_type', legend=False)
-    plt.title('不同用户类型的好友数中位数比较')
-    plt.ylabel('好友数中位数')
-    plt.xlabel('用户类型')
+    plt.title('Median Number of Friends by User Type')
+    plt.ylabel('Median Number of Friends')
+    plt.xlabel('User Type')
     plt.xticks(rotation=15)
     
     plt.tight_layout()
     plt.show()
         
-    # 3. 小提琴图 - 展示完整数据分布
+    # 3. Violin plot - show complete data distribution
     plt.figure(figsize=(18, 6))
     
-    # 关注数分布
+    # Followers distribution
     plt.subplot(1, 3, 1)
     sns.violinplot(x='user_type', y='followers', data=df, palette=palette, order=type_order)
-    plt.title('不同用户类型的关注数分布')
-    plt.ylabel('关注数')
-    plt.xlabel('用户类型')
+    plt.title('Followers Distribution by User Type')
+    plt.ylabel('Number of Followers')
+    plt.xlabel('User Type')
     plt.xticks(rotation=15)
-    plt.yscale('log')  # 使用对数刻度处理极端值
+    plt.yscale('log')  # Use log scale to handle outliers
     
-    # 粉丝数分布
+    # Fans distribution
     plt.subplot(1, 3, 2)
     sns.violinplot(x='user_type', y='fans', data=df, palette=palette, order=type_order)
-    plt.title('不同用户类型的粉丝数分布')
-    plt.ylabel('粉丝数')
-    plt.xlabel('用户类型')
+    plt.title('Fans Distribution by User Type')
+    plt.ylabel('Number of Fans')
+    plt.xlabel('User Type')
     plt.xticks(rotation=15)
-    plt.yscale('log')  # 使用对数刻度处理极端值
+    plt.yscale('log')  # Use log scale to handle outliers
     
-    # 好友数分布
+    # Friends distribution
     plt.subplot(1, 3, 3)
     sns.violinplot(x='user_type', y='friend', data=df, palette=palette, order=type_order)
-    plt.title('不同用户类型的好友数分布')
-    plt.ylabel('好友数')
-    plt.xlabel('用户类型')
+    plt.title('Friends Distribution by User Type')
+    plt.ylabel('Number of Friends')
+    plt.xlabel('User Type')
     plt.xticks(rotation=15)
-    plt.yscale('log')  # 使用对数刻度处理极端值
+    plt.yscale('log')  # Use log scale to handle outliers
     
     plt.tight_layout()
     plt.show()
     
-    # 4. 用户类型数量分布
+    # 4. User count distribution by user type
     type_counts = df['user_type'].value_counts().reindex(type_order)
     
     plt.figure(figsize=(10, 6))
     sns.barplot(x=type_counts.index, y=type_counts.values, palette=palette,
                 hue=type_counts.index, legend=False)
-    plt.title('不同用户类型的数量分布')
-    plt.ylabel('用户数量')
-    plt.xlabel('用户类型')
+    plt.title('User Count Distribution by User Type')
+    plt.ylabel('Number of Users')
+    plt.xlabel('User Type')
     plt.xticks(rotation=15)
     
-    # 添加数量标签
+    # Add count labels
     for i, v in enumerate(type_counts.values):
         plt.text(i, v + 50, f'{v}', ha='center')
     
     plt.tight_layout()
     plt.show()
     
-    # 5. 各类型用户的社交指标比率（粉丝数/关注数）
-    df['fans_follow_ratio'] = df['fans'] / (df['followers'] + 1)  # +1避免除零
+    # 5. Social metric ratio (fans/followers) for each user type
+    df['fans_follow_ratio'] = df['fans'] / (df['followers'] + 1)  # +1 to avoid division by zero
     
     plt.figure(figsize=(10, 6))
     sns.barplot(x='user_type', y='fans_follow_ratio', data=df, palette=palette,
                 order=type_order, hue='user_type', legend=False)
-    plt.title('不同用户类型的粉丝数/关注数比率')
-    plt.ylabel('粉丝数/关注数')
-    plt.xlabel('用户类型')
+    plt.title('Fans-to-Followers Ratio by User Type')
+    plt.ylabel('Fans-to-Followers Ratio')
+    plt.xlabel('User Type')
     plt.xticks(rotation=15)
     plt.yscale('log')
     
     plt.tight_layout()
     plt.show()
 
-# 执行分析和可视化
+# Execute analysis and visualization
 if __name__ == "__main__":
     df = statistic()
     graph(df)

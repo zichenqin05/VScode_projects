@@ -3,35 +3,35 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
-# 设置中文字体
+# Set font (can be changed to default if not needed)
 plt.rcParams['font.family'] = ['SimHei']
 plt.rcParams['axes.unicode_minus'] = False
 
 def time_interval(df):
-    """划分时长区间并返回统计结果"""
+    """Divide duration into intervals and return statistics"""
     if 'duration_seconds' not in df.columns:
-        raise ValueError("DataFrame必须包含'duration_seconds'列")
+        raise ValueError("DataFrame must contain 'duration_seconds' column")
     
-    # 定义区间
+    # Define intervals
     intervals = []
-    intervals.append((0, 0.01, '0秒（照片）'))  # 特殊区间
+    intervals.append((0, 0.01, '0s (photo)'))  # Special interval
     
-    # 短时长（0.01-600秒，每30秒一个区间）
+    # Short duration (0.01-600s, every 30s an interval)
     i = 0.01
     while i < 10 * 60:
         next_i = i + 30
-        intervals.append((i, next_i, f'{i:.2f}-{next_i:.0f}秒'))
+        intervals.append((i, next_i, f'{i:.2f}-{next_i:.0f}s'))
         i = next_i
     
-    # 中等时长（600-3600秒，每5分钟一个区间）
+    # Medium duration (600-3600s, every 5min an interval)
     for i in range(10*60, 60*60, 5*60):
-        intervals.append((i, i+5*60, f'{i}-{i+5*60}秒'))
+        intervals.append((i, i+5*60, f'{i}-{i+5*60}s'))
     
-    # 长时长（3600秒以上）
-    intervals.append((3600, 18000, '3600-18000秒'))
-    intervals.append((18000, float('inf'), '18000秒以上'))
+    # Long duration (above 3600s)
+    intervals.append((3600, 18000, '3600-18000s'))
+    intervals.append((18000, float('inf'), 'above 18000s'))
 
-    # 统计区间数量
+    # Count number in each interval
     duration_stats = {interval[2]: 0 for interval in intervals}
     for duration in df['duration_seconds']:
         for low, high, label in intervals:
@@ -39,76 +39,76 @@ def time_interval(df):
                 duration_stats[label] += 1
                 break
     
-    # 转换为DataFrame并计算占比
-    result_df = pd.DataFrame(list(duration_stats.items()), columns=['时长区间', '数量'])
-    total = result_df['数量'].sum()
-    result_df['占比(%)'] = (result_df['数量'] / total * 100).round(2)
+    # Convert to DataFrame and calculate percentage
+    result_df = pd.DataFrame(list(duration_stats.items()), columns=['Duration Interval', 'Count'])
+    total = result_df['Count'].sum()
+    result_df['Percent(%)'] = (result_df['Count'] / total * 100).round(2)
     
-    # 排序
-    result_df['区间排序'] = result_df['时长区间'].apply(
+    # Sort
+    result_df['Interval Order'] = result_df['Duration Interval'].apply(
         lambda x: [i for i, interval in enumerate(intervals) if interval[2] == x][0]
     )
 
     result_df = result_df.iloc[:23] 
 
-    return result_df.sort_values('区间排序').drop('区间排序', axis=1).reset_index(drop=True)
+    return result_df.sort_values('Interval Order').drop('Interval Order', axis=1).reset_index(drop=True)
 
 def calculate_stats(df):
-    """计算关键统计量"""
+    """Calculate key statistics"""
     positive_durations = df[df['duration_seconds'] > 0]['duration_seconds']
     stats = {
-        '总样本量': len(df),
-        '有效样本量': len(positive_durations),
-        '均值': positive_durations.mean() if not positive_durations.empty else None,
-        '中位数': positive_durations.median() if not positive_durations.empty else None,
-        '大于0的最小值': positive_durations.min() if not positive_durations.empty else None,
-        '最大值': df['duration_seconds'].max()
+        'Total Samples': len(df),
+        'Valid Samples': len(positive_durations),
+        'Mean': positive_durations.mean() if not positive_durations.empty else None,
+        'Median': positive_durations.median() if not positive_durations.empty else None,
+        'Min Positive': positive_durations.min() if not positive_durations.empty else None,
+        'Max': df['duration_seconds'].max()
     }
     return stats
 
 def plot_duration_distribution(result_df, stats):
-    """绘制区间分布柱状图并在右上角添加统计量"""
+    """Plot interval distribution bar chart and show statistics in the top right"""
     plt.figure(figsize=(16, 8))
     
-    # 绘制柱状图
-    bars = plt.bar(result_df['时长区间'], result_df['数量'], color='#4A90E2', alpha=0.8)
+    # Plot bar chart
+    bars = plt.bar(result_df['Duration Interval'], result_df['Count'], color='#4A90E2', alpha=0.8)
     
-    # 添加数量标签
+    # Add count labels
     for bar in bars:
         height = bar.get_height()
-        if height > 0:  # 只显示有数据的标签
+        if height > 0:
             plt.text(bar.get_x() + bar.get_width()/2, height + 5,
                     f'{height}', ha='center', va='bottom', fontsize=9)
     
-    # 设置图表标题和坐标轴
-    plt.title('视频时长区间分布', fontsize=16, pad=20)
-    plt.xlabel('时长区间', fontsize=12, labelpad=10)
-    plt.ylabel('视频数量', fontsize=12, labelpad=10)
+    # Set chart title and axes
+    plt.title('Video Duration Interval Distribution', fontsize=16, pad=20)
+    plt.xlabel('Duration Interval', fontsize=12, labelpad=10)
+    plt.ylabel('Video Count', fontsize=12, labelpad=10)
     plt.xticks(rotation=45, ha='right', fontsize=9)
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     
-    # 添加统计量文本框
-    stats_text = "统计信息：\n"
-    stats_text += f"总样本量：{stats['总样本量']}\n"
-    stats_text += f"有效样本量：{stats['有效样本量']}\n"
-    stats_text += f"均值：{stats['均值']:.1f}秒\n" if stats['均值'] else "均值：无数据\n"
-    stats_text += f"中位数：{stats['中位数']:.1f}秒\n" if stats['中位数'] else "中位数：无数据\n"
-    stats_text += f"最小正值：{stats['大于0的最小值']:.1f}秒\n" if stats['大于0的最小值'] else "最小正值：无数据\n"
-    stats_text += f"最大值：{stats['最大值']:.1f}秒" if stats['最大值'] else "最大值：无数据"
+    # Add statistics textbox
+    stats_text = "Statistics:\n"
+    stats_text += f"Total Samples: {stats['Total Samples']}\n"
+    stats_text += f"Valid Samples: {stats['Valid Samples']}\n"
+    stats_text += f"Mean: {stats['Mean']:.1f}s\n" if stats['Mean'] else "Mean: N/A\n"
+    stats_text += f"Median: {stats['Median']:.1f}s\n" if stats['Median'] else "Median: N/A\n"
+    stats_text += f"Min Positive: {stats['Min Positive']:.1f}s\n" if stats['Min Positive'] else "Min Positive: N/A\n"
+    stats_text += f"Max: {stats['Max']:.1f}s" if stats['Max'] else "Max: N/A"
     
-    # 调整文本框位置到右上角:
+    # Place textbox at top right
     plt.gcf().text(0.87, 0.83, stats_text, fontsize=10, 
                   bbox=dict(facecolor='white', edgecolor='gray', pad=10),
                   verticalalignment='top',  
                   horizontalalignment='left')  
     
-    # 调整布局
+    # Adjust layout
     plt.tight_layout()
-    plt.subplots_adjust(right=0.95, top=0.85)  # 预留右上角空间
+    plt.subplots_adjust(right=0.95, top=0.85)
     plt.show()
 
 if __name__ == "__main__":
-    # 1. 获取数据
+    # 1. Get data
     df = sql.do("""
         SELECT video_duration 
         FROM video_features_basic_pure
@@ -116,11 +116,11 @@ if __name__ == "__main__":
     """)
     df = pd.DataFrame(df, columns=['video_duration'])
     df['video_duration'] = pd.to_numeric(df['video_duration'])
-    df['duration_seconds'] = df['video_duration'] / 1000  # 毫秒转秒
+    df['duration_seconds'] = df['video_duration'] / 1000  # ms to s
     
-    # 2. 计算区间分布和统计量
+    # 2. Calculate interval distribution and statistics
     interval_df = time_interval(df)
     stats = calculate_stats(df)
     
-    # 3. 绘图
+    # 3. Plot
     plot_duration_distribution(interval_df, stats)

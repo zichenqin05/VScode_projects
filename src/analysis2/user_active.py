@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import f_oneway
 
-# 设置中文显示
+# Set Chinese font for display
 plt.rcParams["font.family"] = ["SimHei"]
 plt.rcParams["axes.unicode_minus"] = False
 
-# 1. 数据获取与预处理
+# 1. Data Acquisition and Preprocessing
 df = sql.do("""SELECT
             user_id,
             follow_user_num,
@@ -25,113 +25,113 @@ df = pd.DataFrame(
     columns=['user_id','follow', 'fans', 'friend', 'active_degree', 'is_author', 'is_live']
 )
 
-# 数据类型转换
+# Data type conversion
 df[['follow', 'fans', 'friend']] = df[['follow', 'fans', 'friend']].apply(
     pd.to_numeric, errors='coerce'
 )
 df['is_author'] = df['is_author'].astype('category')
 df['is_live'] = df['is_live'].astype('category')
-df['active_degree'] = df['active_degree'].astype('category')  # 保持原始分组类别
+df['active_degree'] = df['active_degree'].astype('category')  # Keep original grouping categories
 
-# 处理缺失值
+# Handle missing values
 df = df.dropna(subset=['follow', 'fans', 'friend', 'active_degree'])
 
 
-# 2. 先统计活跃分组的类别及数量（核心步骤：明确有哪些分组）
+# 2. First, count categories and quantities of active groups (Core step: Identify all groups)
 active_categories = df['active_degree'].value_counts().reset_index()
-active_categories.columns = ['活跃分组', '用户数量']
-active_categories['占比'] = active_categories['用户数量'] / len(df)
-active_categories['占比'] = active_categories['占比'].apply(lambda x: f'{x:.2%}')
+active_categories.columns = ['Active Group', 'User Count']
+active_categories['Proportion'] = active_categories['User Count'] / len(df)
+active_categories['Proportion'] = active_categories['Proportion'].apply(lambda x: f'{x:.2%}')
 
-print("活跃分组类别及数量统计：")
-print(active_categories.sort_values('用户数量', ascending=False))  # 按数量排序
+print("Statistics of Active Group Categories and Quantities:")
+print(active_categories.sort_values('User Count', ascending=False))  # Sort by quantity
 
 
-# 3. 分析1：不同活跃分组的社交指标差异（直接用原始分组）
-## 3.1 各活跃分组的社交指标均值对比
+# 3. Analysis 1: Differences in social metrics across active groups (Using original groups directly)
+## 3.1 Comparison of average social metrics across active groups
 active_social_stats = df.groupby('active_degree')[['follow', 'fans', 'friend']].mean().reset_index()
-active_social_stats = active_social_stats.rename(columns={'active_degree': '活跃分组'})
-print("\n各活跃分组的社交指标均值：")
+active_social_stats = active_social_stats.rename(columns={'active_degree': 'Active Group'})
+print("\nAverage Social Metrics by Active Group:")
 print(active_social_stats.round(2))
 
-# 可视化：柱状图（按原始分组展示）
+# Visualization: Bar charts (Display by original groups)
 plt.figure(figsize=(12, 8))
-# 关注数与活跃分组的关系
+# Relationship between follow count and active groups
 plt.subplot(3, 1, 1)
-sns.barplot(x='活跃分组', y='follow', data=active_social_stats, palette='Set2')
-plt.title('不同活跃分组的关注数均值')
-plt.ylabel('关注数均值')
-plt.xticks(rotation=45)  # 旋转标签避免重叠
+sns.barplot(x='Active Group', y='follow', data=active_social_stats, palette='Set2')
+plt.title('Average Follow Count by Active Group')
+plt.ylabel('Average Follow Count')
+plt.xticks(rotation=45)  # Rotate labels to avoid overlap
 
-# 粉丝数与活跃分组的关系
+# Relationship between fan count and active groups
 plt.subplot(3, 1, 2)
-sns.barplot(x='活跃分组', y='fans', data=active_social_stats, palette='Set2')
-plt.title('不同活跃分组的粉丝数均值')
-plt.ylabel('粉丝数均值')
+sns.barplot(x='Active Group', y='fans', data=active_social_stats, palette='Set2')
+plt.title('Average Fan Count by Active Group')
+plt.ylabel('Average Fan Count')
 plt.xticks(rotation=45)
 
-# 朋友数与活跃分组的关系
+# Relationship between friend count and active groups
 plt.subplot(3, 1, 3)
-sns.barplot(x='活跃分组', y='friend', data=active_social_stats, palette='Set2')
-plt.title('不同活跃分组的朋友数均值')
-plt.ylabel('朋友数均值')
+sns.barplot(x='Active Group', y='friend', data=active_social_stats, palette='Set2')
+plt.title('Average Friend Count by Active Group')
+plt.ylabel('Average Friend Count')
 plt.xticks(rotation=45)
 
 plt.tight_layout()
 plt.show()
 
 
-# 3.2 社交指标在活跃分组间的差异显著性（ANOVA检验）
-# 提取原始活跃分组的类别列表
+# 3.2 Significance of differences in social metrics across active groups (ANOVA test)
+# Extract list of original active group categories
 active_groups = df['active_degree'].cat.categories.tolist()
 
 for col in ['follow', 'fans', 'friend']:
-    # 按原始分组提取数据
+    # Extract data by original groups
     data_groups = [df[df['active_degree'] == g][col].dropna() for g in active_groups]
     f_val, p_val = f_oneway(*data_groups)
-    significance = "存在显著差异" if p_val < 0.05 else "无显著差异"
-    print(f"\n{col}数在各活跃分组间的ANOVA结果：F值={f_val.round(3)}，P值={p_val.round(4)}（{significance}）")
+    significance = "Significant difference exists" if p_val < 0.05 else "No significant difference"
+    print(f"\nANOVA Result for {col} Count Across Active Groups: F-value={f_val.round(3)}, P-value={p_val.round(4)} ({significance})")
 
 
-# 4. 分析2：直播主播的粉丝数与活跃分组的关系
+# 4. Analysis 2: Relationship between fan count of live streamers and active groups
 live_users = df[df['is_live'] == '1']
 if len(live_users) > 0:
     live_fans_stats = live_users.groupby('active_degree')['fans'].mean().reset_index()
-    live_fans_stats = live_fans_stats.rename(columns={'active_degree': '活跃分组'})
-    print("\n直播主播在各活跃分组的粉丝数均值：")
+    live_fans_stats = live_fans_stats.rename(columns={'active_degree': 'Active Group'})
+    print("\nAverage Fan Count of Live Streamers by Active Group:")
     print(live_fans_stats.round(2))
     
-    # 可视化：折线图（展示趋势）
+    # Visualization: Line chart (Show trend)
     plt.figure(figsize=(10, 5))
-    sns.pointplot(x='活跃分组', y='fans', data=live_fans_stats, color='red', markers='o')
-    plt.title('直播主播：粉丝数与活跃分组的关系')
-    plt.xlabel('活跃分组')
-    plt.ylabel('粉丝数均值')
+    sns.pointplot(x='Active Group', y='fans', data=live_fans_stats, color='red', markers='o')
+    plt.title('Live Streamers: Relationship Between Fan Count and Active Group')
+    plt.xlabel('Active Group')
+    plt.ylabel('Average Fan Count')
     plt.xticks(rotation=45)
     plt.show()
 else:
-    print("\n无直播主播样本，无法分析粉丝数与活跃分组的关系")
+    print("\nNo live streamer samples available; cannot analyze relationship between fan count and active groups")
 
 
-# 5. 分析3：朋友数与低活跃分组的关系（假设低活跃分组可从原始类别中识别，如'2_14_day_new'）
-# 先从活跃分组中确认低活跃标签（例如你认为'2_14_day_new'是低活跃）
-low_active_labels = ['2_14_day_new']  # 根据你的实际低活跃分组修改
+# 5. Analysis 3: Relationship between friend count and low-active groups (Assume low-active groups can be identified from original categories, e.g., '2_14_day_new')
+# First, confirm low-active labels from active groups (e.g., '2_14_day_new' is considered low-active in your case)
+low_active_labels = ['2_14_day_new']  # Modify based on your actual low-active groups
 df['is_lowactive'] = df['active_degree'].isin(low_active_labels)
 
-# 按朋友数分组，计算低活跃比例
-friend_bins = pd.qcut(df['friend'], q=2, labels=['低朋友数', '高朋友数'])
+# Group by friend count and calculate low-active proportion
+friend_bins = pd.qcut(df['friend'], q=2, labels=['Low Friend Count', 'High Friend Count'])
 lowactive_by_friend = df.groupby(friend_bins)['is_lowactive'].mean().reset_index()
-lowactive_by_friend = lowactive_by_friend.rename(columns={'friend': '朋友数组'})
-lowactive_by_friend['低活跃比例'] = lowactive_by_friend['is_lowactive'].apply(lambda x: f'{x:.2%}')
+lowactive_by_friend = lowactive_by_friend.rename(columns={'friend': 'Friend Count Group'})
+lowactive_by_friend['Low-Active Proportion'] = lowactive_by_friend['is_lowactive'].apply(lambda x: f'{x:.2%}')
 
-print("\n不同朋友数组的低活跃比例：")
-print(lowactive_by_friend[['朋友数组', '低活跃比例']])
+print("\nLow-Active Proportion by Friend Count Group:")
+print(lowactive_by_friend[['Friend Count Group', 'Low-Active Proportion']])
 
-# 可视化：柱状图
+# Visualization: Bar chart
 plt.figure(figsize=(8, 5))
-sns.barplot(x='朋友数组', y='is_lowactive', data=lowactive_by_friend, palette='Set3')
-plt.title('朋友数与低活跃分组的关系')
-plt.ylabel('低活跃比例')
+sns.barplot(x='Friend Count Group', y='is_lowactive', data=lowactive_by_friend, palette='Set3')
+plt.title('Relationship Between Friend Count and Low-Active Groups')
+plt.ylabel('Low-Active Proportion')
 for i, v in enumerate(lowactive_by_friend['is_lowactive']):
     plt.text(i, v+0.02, f'{v:.2%}', ha='center')
 plt.show()

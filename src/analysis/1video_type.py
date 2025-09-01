@@ -5,42 +5,42 @@ import matplotlib.pyplot as plt
 plt.rcParams['font.family'] = ['SimHei']
 plt.rcParams['axes.unicode_minus'] = False
 
-# 获取每种类型的数量
+# Get the count of each type
 df = sql.search('video_type','video_features_basic_pure')
 
-# 计算总数量
+# Calculate total count
 total = df['count'].sum()
 
-# 计算占比（保留两位小数）
+# Calculate percentage (keep two decimals)
 df['percent'] = (df['count'] / total * 100).round(2)
 
 print(df)
 
-plt.figure(figsize=(12, 6))  # 设置画布大小
+plt.figure(figsize=(12, 6))  # Set canvas size
 bar_width = 0.6
 
-bars = plt.bar(df['video_type'], df['count'], width=bar_width, color='#4A90E2', label='数量')
+bars = plt.bar(df['video_type'], df['count'], width=bar_width, color='#4A90E2', label='Count')
 
-# 绘制右侧占比坐标轴
+# Draw right-side percentage axis
 ax2 = plt.twinx()
-ax2.plot(df['video_type'], df['percent'], color='#FF7A00', marker='o', linestyle='-', linewidth=2, label='占比(%)')
+ax2.plot(df['video_type'], df['percent'], color='#FF7A00', marker='o', linestyle='-', linewidth=2, label='Percent(%)')
 
-# 设置图表标题和坐标轴标签
-plt.title('视频类型分布统计', fontsize=16, pad=20)
-plt.xlabel('视频类型', fontsize=12, labelpad=10)
-plt.ylabel('数量', fontsize=12, labelpad=10, color='#4A90E2')
-ax2.set_ylabel('占比(%)', fontsize=12, labelpad=10, color='#FF7A00')
+# Set chart title and axis labels
+plt.title('The Distribution of Video Types', fontsize=16, pad=20)
+plt.xlabel('Video Type', fontsize=12, labelpad=10)
+plt.ylabel('Count', fontsize=12, labelpad=10, color='#4A90E2')
+ax2.set_ylabel('Percent(%)', fontsize=12, labelpad=10, color='#FF7A00')
 
-# 设置网格线
+# Set grid lines
 plt.grid(axis='y', linestyle='--', alpha=0.7)
 
-# 添加图例
+# Add legends
 plt.legend(loc='upper left')
 ax2.legend(loc='upper right')
 
-# 调整x轴标签角度
+# Adjust x-axis label angle
 plt.xticks(rotation=45, ha='right')
 
-# 调整布局并显示图表
+# Adjust layout and show chart
 plt.tight_layout()
 plt.show()

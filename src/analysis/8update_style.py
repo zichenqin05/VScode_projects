@@ -14,28 +14,28 @@ df = pd.DataFrame(df, columns=['video_id', 'upload_type'])
 df2 = quality.video_quality()
 data = pd.merge(df, df2, on='video_id')
 
-# 按upload_type分组，计算统计量
+# Group by upload_type and calculate statistics
 stats = data.groupby('upload_type')['quality_level'].agg(
-    样本量='count',
-    均值='mean',
-    标准差='std',
-    最优值='min',
-    最差值='max'
+    sample_count='count',
+    mean_value='mean',
+    std_deviation='std',
+    best_value='min',
+    worst_value='max'
 ).reset_index()
 
-# 处理标准差为NaN的情况（当某组只有1个样本时，标准差无意义）
-stats['标准差'] = stats['标准差'].fillna(0)
+# Handle NaN in std_deviation (meaningless when a group has only 1 sample)
+stats['std_deviation'] = stats['std_deviation'].fillna(0)
 
 print(stats)
 
 def graph():
-    # 设置中文字体
+    # Set Chinese font (retained for potential Chinese display needs)
     plt.rcParams['font.family'] = ['SimHei']
     plt.rcParams['axes.unicode_minus'] = False
     
     plt.figure(figsize=(10, 6))
 
-    # 绘制箱线图
+    # Plot boxplot
     sns.boxplot(
         data=data,
         x='upload_type',
@@ -43,7 +43,7 @@ def graph():
         palette='Set3'
     )
 
-    # 添加散点显示原始数据分布
+    # Add scatter plot to show raw data distribution
     sns.stripplot(
         data=data,
         x='upload_type',
@@ -53,40 +53,38 @@ def graph():
         alpha=0.5
     )
 
-    plt.title('不同上传类型的用户体验质量分布', fontsize=14)
-    plt.xlabel('上传类型', fontsize=12)
-    plt.ylabel('质量水平', fontsize=12)
+    plt.title('User Experience Quality Distribution by Upload Type', fontsize=14)
+    plt.xlabel('Upload Type', fontsize=12)
+    plt.ylabel('Quality Level', fontsize=12)
     plt.xticks(rotation=45)
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     plt.tight_layout()
     plt.show()
 
 def graph2():
-    # 设置中文字体
+    # Set Chinese font (retained for potential Chinese display needs)
     plt.rcParams['font.family'] = ['SimHei']
     plt.rcParams['axes.unicode_minus'] = False
     
     plt.figure(figsize=(10, 6))
 
-
-
-    # 绘制条形图（x轴为上传类型，y轴为均值，误差线为标准差）
+    # Plot bar chart (x-axis: upload type, y-axis: mean value, error bars: standard deviation)
     sns.barplot(
         data=data,
         x='upload_type',
         y='quality_level',
-        errorbar='sd',  # 误差线显示标准差
-        capsize=0.1,    # 误差线顶部横线长度
+        errorbar='sd',  # Error bars show standard deviation
+        capsize=0.1,    # Length of horizontal lines on error bars
         palette='Set2'
     )
 
-    # 添加标题和标签
-    plt.title('不同上传类型的用户体验质量水平', fontsize=14)
-    plt.xlabel('上传类型', fontsize=12)
-    plt.ylabel('质量水平（均值±标准差）', fontsize=12)
-    plt.xticks(rotation=45)  # 旋转x轴标签，避免重叠
+    # Add title and labels
+    plt.title('User Experience Quality Level by Upload Type', fontsize=14)
+    plt.xlabel('Upload Type', fontsize=12)
+    plt.ylabel('Quality Level (Mean ± Std Dev)', fontsize=12)
+    plt.xticks(rotation=45)  # Rotate x-axis labels to avoid overlap
     plt.grid(axis='y', linestyle='--', alpha=0.7)
-    plt.tight_layout()  # 自动调整布局
+    plt.tight_layout()  # Auto-adjust layout
     plt.show()
 
 if __name__ == "__main__":

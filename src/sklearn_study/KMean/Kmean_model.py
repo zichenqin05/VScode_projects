@@ -33,16 +33,16 @@ def create_user_features(df):
     return user_features
 
 def cluster_users(user_features, n_clusters=5):
-    """对用户进行聚类"""
-    # 提取特征列（排除user_id）
+    """Cluster users"""
+    # Extract feature columns (exclude user_id)
     feature_cols = user_features.columns.drop('user_id')
     X = user_features[feature_cols].values
     
-    # 特征标准化（聚类算法对尺度敏感）
+    # Feature standardization (clustering algorithms are sensitive to scales)
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    # 应用K-Means聚类
+    # Apply K-Means clustering
     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     user_features['cluster'] = kmeans.fit_predict(X_scaled)
     

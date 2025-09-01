@@ -18,12 +18,12 @@ def graph1():
     plt.figure(figsize=(12, 6))  # 设置画布大小
     bar_width = 0.6
 
-    bars = plt.bar(df['tag'], df['count'], width=bar_width, color='#4A90E2', label='数量')
+    bars = plt.bar(df['tag'], df['count'], width=bar_width, color='#4A90E2', label='count')
 
     # 设置图表标题和坐标轴标签
-    plt.title('视频标签分布统计(top20)', fontsize=16, pad=20)
-    plt.xlabel('标签', fontsize=12, labelpad=10)
-    plt.ylabel('数量', fontsize=12, labelpad=10, color='#4A90E2')
+    plt.title('The distribution of video tag(tag 20)', fontsize=16, pad=20)
+    plt.xlabel('tag', fontsize=12, labelpad=10)
+    plt.ylabel('count', fontsize=12, labelpad=10, color='#4A90E2')
 
 
     # 设置网格线
@@ -48,12 +48,12 @@ def graph2(df2):
     plt.figure(figsize=(12, 6))  # 设置画布大小
     bar_width = 0.6
 
-    bars = plt.bar(df2['upload_dt'], df2['count'], width=bar_width, color='#4A90E2', label='数量')
+    bars = plt.bar(df2['upload_dt'], df2['count'], width=bar_width, color='#4A90E2', label='count')
 
     # 设置图表标题和坐标轴标签
-    plt.title('视频发布时间分布统计', fontsize=16, pad=20)
-    plt.xlabel('日期', fontsize=12, labelpad=10)
-    plt.ylabel('数量', fontsize=12, labelpad=10, color='#4A90E2')
+    plt.title('The distribution of video release times', fontsize=16, pad=20)
+    plt.xlabel('date', fontsize=12, labelpad=10)
+    plt.ylabel('count', fontsize=12, labelpad=10, color='#4A90E2')
 
 
     # 设置网格线

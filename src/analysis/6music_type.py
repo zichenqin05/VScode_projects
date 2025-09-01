@@ -9,26 +9,26 @@ def graph1(df):
     plt.rcParams['axes.unicode_minus'] = False
 
 
-    plt.figure(figsize=(12, 6))  # 设置画布大小
+    plt.figure(figsize=(12, 6))  # Set figure size
     bar_width = 0.6
 
-    bars = plt.bar(df['music_id'], df['count'], width=bar_width, color='#4A90E2', label='次数')
+    bars = plt.bar(df['music_id'], df['count'], width=bar_width, color='#4A90E2', label='Count')
 
-    # 设置图表标题和坐标轴标签
-    plt.title('音乐使用频率图', fontsize=16, pad=20)
-    plt.xlabel('音乐id', fontsize=12, labelpad=10)
-    plt.ylabel('次数', fontsize=12, labelpad=10, color='#4A90E2')
+    # Set chart title and axis labels
+    plt.title('Music Usage Frequency', fontsize=16, pad=20)
+    plt.xlabel('Music ID', fontsize=12, labelpad=10)
+    plt.ylabel('Count', fontsize=12, labelpad=10, color='#4A90E2')
 
-    # 设置网格线
+    # Set grid lines
     plt.grid(axis='y', linestyle='--', alpha=0.7)
 
-    # 添加图例
+    # Add legend
     plt.legend(loc='upper left')
 
-    # 调整x轴标签角度
+    # Adjust x-axis label angle
     plt.xticks(rotation=45, ha='right')
 
-    # 调整布局并显示图表
+    # Adjust layout and display
     plt.tight_layout()
     plt.show()
 
@@ -36,51 +36,51 @@ def get_harmonious_colors(n):
 
     colors = []
     for i in range(n):
-        # 均匀分布色相，确保颜色多样性
-        hue = i / n + random.uniform(-0.1, 0.1)  # 增加一点随机性
-        hue = hue % 1.0  # 确保在0-1范围内
+        # Distribute hue evenly for color diversity
+        hue = i / n + random.uniform(-0.1, 0.1)  # Add some randomness
+        hue = hue % 1.0  # Ensure within 0-1 range
         
-        # 固定柔和的饱和度和明度
+        # Fixed soft saturation and brightness
         saturation = random.uniform(0.4, 0.6)
         value = random.uniform(0.7, 0.9)
         
-        # 转换为RGB
+        # Convert to RGB
         r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
         colors.append((r, g, b))
     return colors
 
-def graph2(df, value_col, label_col, title="音乐类型分布图", 
+def graph2(df, value_col, label_col, title="Music Type Distribution", 
            explode=None, autopct='%1.1f%%', shadow=False, figsize=(8, 6)):
   
-    # 设置中文字体
+    # Set Chinese font
     plt.rcParams['font.family'] = ['SimHei']
     plt.rcParams['axes.unicode_minus'] = False
     
-    # 提取数据
+    # Extract data
     sizes = df[value_col].values
     labels = df[label_col].values
     
-    # 生成和谐的随机颜色
+    # Generate harmonious random colors
     colors = get_harmonious_colors(len(sizes))
     
-    # 绘制饼图
+    # Draw pie chart
     plt.figure(figsize=figsize)
     wedges, texts, autotexts = plt.pie(
         sizes, explode=explode, labels=labels, colors=colors,
         autopct=autopct, shadow=shadow, startangle=90,
-        textprops=dict(fontsize=10)  # 设置标签字体大小
+        textprops=dict(fontsize=10)  # Set label font size
     )
     
-    # 美化百分比文本
+    # Beautify percentage text
     plt.setp(autotexts, size=9, weight="bold", color="white")
     
-    # 确保饼图为正圆形
+    # Ensure pie chart is circular
     plt.axis('equal')
     
-    # 设置标题
+    # Set title
     plt.title(title, fontsize=15, pad=20) 
     
-    # 调整布局并显示
+    # Adjust layout and display
     plt.tight_layout()
     plt.show()
 

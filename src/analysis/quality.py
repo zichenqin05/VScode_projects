@@ -2,7 +2,7 @@ import sql
 import pandas as pd
 import numpy as np
 
-def data_luncher():
+def data_launcher():
     df = sql.do("""SELECT
             v.video_id,
             v.video_duration,
@@ -20,7 +20,7 @@ def data_luncher():
         ON
             v.video_id = s.video_id""")
 
-    df = pd.DataFrame(df, columns=['video_id','video_duration','width','height','like','complete_play','share','commnet_user_number','play_progress'])
+    df = pd.DataFrame(df, columns=['video_id','video_duration','width','height','like','complete_play','share','comment_user_number','play_progress'])
 
     def normalize_resolution(row):
         min_dim = min(row['width'], row['height'])
@@ -29,21 +29,21 @@ def data_luncher():
 
     df['resolution'] = df.apply(normalize_resolution, axis=1)
 
-    # 转换为秒
+    # Convert to seconds
     df['video_duration'] = pd.to_numeric(df['video_duration'], errors='coerce')  
     df['video_duration'] = df['video_duration'] / 100 
 
     df = df.drop(columns=['height','width'])
     return df
 
-def main_Model():
-    # 获取数据
-    data = data_luncher()
+def main_model():
+    # Get data
+    data = data_launcher()
 
-    # 分数列
+    # Score column
     data['score'] = 0
 
-    # 2. 分辨率打分
+    # 2. Resolution scoring
     resolution_scores = {
     '1440.0×1080.0': 5,
     '1280.0×720.0': 4,
@@ -51,55 +51,54 @@ def main_Model():
     '960.0×720.0': 2,
     '720.0×720.0': 1
     }
-    # 循环打分
+    # Loop to assign scores
     for resolution, add_score in resolution_scores.items():
         data.loc[data['resolution'] == resolution, 'score'] += add_score
 
     def give_score(data, bins, part):
         labels = [1, 2, 3, 4, 5]
         data[f'{part}'] = pd.to_numeric(data[f'{part}'], errors='coerce').fillna(0)
-        data[f'{part}_score'] = pd.cut(data[f'{part}'], bins =bins, labels=labels, include_lowest=True).astype(int)
+        data[f'{part}_score'] = pd.cut(data[f'{part}'], bins=bins, labels=labels, include_lowest=True).astype(int)
 
         data['score'] = data['score'] + data[f'{part}_score']
         data = data.drop(columns=[f'{part}_score'])
         return data
 
-    # 3. 点赞数打分
+    # 3. Like count scoring
     bins = [0, 100, 500, 1000, 3000, float('inf')]
     data = give_score(data, bins, 'like')
 
-    # 4. 完播打分
+    # 4. Complete play count scoring
     bins2 = [0, 500, 1000, 5000, 10000, float('inf')]
-    data = give_score(data,bins2, 'complete_play')
+    data = give_score(data, bins2, 'complete_play')
 
-    # 5. 分享打分
+    # 5. Share count scoring
     bins3 = [0, 0.5, 3, 10, 100, float('inf')]
     data = give_score(data, bins3, 'share')
 
-    # 6. 评论打分
+    # 6. Comment user count scoring
     bins4 = [0, 0.5, 10, 50, 100, float('inf')]
-    data = give_score(data, bins4, 'commnet_user_number')
+    data = give_score(data, bins4, 'comment_user_number')
 
-    # 7. 播放率打分
+    # 7. Play progress (watch rate) scoring
     bins5 = [0, 0.10, 0.30, 0.50, 0.80, float('inf')]
     data = give_score(data, bins5, 'play_progress')
 
     return data
 
 def grade():
+    data = main_model()
 
-    data = main_Model()
-
-    # 定义等级区间和对应的标签
+    # Define grade intervals and corresponding labels
     bins = [-np.inf, 7, 14, 21, np.inf] 
-    labels = [4, 3, 2, 1]  # 对应等级: 1级最好，4级最差
+    labels = [4, 3, 2, 1]  # Corresponding grades: 1 = best, 4 = worst
     
-    # 划分等级
+    # Assign grades
     data['quality_level'] = pd.cut(
         data['score'],
         bins=bins,
         labels=labels,
-        include_lowest=True  # 包含左边界
+        include_lowest=True  # Include left boundary
     ).astype(int)
     
     data = data.drop(columns=['score'])
@@ -112,6 +111,5 @@ def video_quality():
     return video_quality
 
 if __name__ == "__main__":
-
     result = grade()
-    print(result.head(20))
+    print(result.head(10))
