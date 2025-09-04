@@ -2,27 +2,27 @@ import pandas as pd
 import joblib  # 用于加载模型
 
 def load_model_and_scaler():
-    """加载保存的模型、标准化器和特征列名"""
-    # 加载模型和标准化器
+    """Load the saved model, standardizer, and feature column names"""
+    # Load model and standardizer
     knn = joblib.load(r'src\sklearn_study\KNN\models\knn_model.pkl')
     scaler = joblib.load(r'src\sklearn_study\KNN\models\scaler.pkl')
-    # 加载特征列名
+    # Load feature column names
     with open(r'src\sklearn_study\KNN\models\feature_columns.txt', 'r') as f:
         feature_columns = f.read().split(',')
     return knn, scaler, feature_columns
 
 def predict_new_video(new_video_data):
-    """预测新视频的质量等级"""
-    # 加载模型组件
+    """Predict the quality level of a new video"""
+    # Load model components
     knn, scaler, feature_columns = load_model_and_scaler()
     
-    # 确保新视频数据的特征列与训练数据一致
+    # Ensure the feature columns of the new video data match those of the training data
     new_video = pd.DataFrame(new_video_data).reindex(columns=feature_columns, fill_value=0)
     
-    # 标准化新数据
+    # Standardize the new data
     new_video_scaled = scaler.transform(new_video)
     
-    # 预测
+    # Predict
     predicted_level = knn.predict(new_video_scaled)
     return predicted_level[0]
 
