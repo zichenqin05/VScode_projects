@@ -1,5 +1,5 @@
-import load_data as ld
-import Kmean_model as km
+from . import load_data as ld
+from . import Kmean_model as km
 
 def lunch_recommendation(target_user):
     # 1. Load and preprocess data
